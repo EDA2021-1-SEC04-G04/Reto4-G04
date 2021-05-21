@@ -49,6 +49,13 @@ while True:
     inputs = input('Seleccione una opción para continuar\n')
     if int(inputs[0]) == 1:
         print("Cargando información de los archivos ....")
+    if int(inputs[0]) == 2:
+    
+    if int(inputs[0]) == 3:
+        
+    if int(inputs[0]) == 4:
+    
+    if int(inputs[0]) == 5:
 
     elif int(inputs[0]) == 2:
         pass
