@@ -39,6 +39,48 @@ def printMenu():
     print("1- Cargar información en el catálogo")
     print("2- ")
 
+def optionTwo(cont):
+    controller.loadPoints(cont, 'landing_points.csv')
+    controller.loadConnections(cont,'connections.csv')
+    controller.loadCountries(cont,'countries.csv')
+    numedges = controller.totalConnections(cont)
+    numvertex = controller.totalStops(cont)
+    print('Numero de vertices: ' + str(numvertex))
+    print('Numero de arcos: ' + str(numedges))
+    #print('El limite de recursion actual: ' + str(sys.getrecursionlimit()))
+
+
+def optionThree(cont):
+    print('El número de componentes conectados es: ' +
+          str(controller.connectedComponents(cont)))
+
+
+def optionFour(cont, initialStation):
+    controller.minimumCostPaths(cont, initialStation)
+
+
+def optionFive(cont, destStation):
+    haspath = controller.hasPath(cont, destStation)
+    print('Hay camino entre la estación base : ' +
+          'y la estación: ' + destStation + ': ')
+    print(haspath)
+    
+def optionSix(cont, destStation):
+    path = controller.minimumCostPath(cont, destStation)
+    if path is not None:
+        pathlen = stack.size(path)
+        print('El camino es de longitud: ' + str(pathlen))
+        while (not stack.isEmpty(path)):
+            stop = stack.pop(path)
+            print(stop)
+    else:
+        print('No hay camino')
+
+def optionSeven(cont):
+    maxvert, maxdeg = controller.servedRoutes(cont)
+    print('Estación: ' + maxvert + '  Total rutas servidas: '
+          + str(maxdeg))
+
 catalog = None
 
 """
@@ -49,6 +91,8 @@ while True:
     inputs = input('Seleccione una opción para continuar\n')
     if int(inputs[0]) == 1:
         print("Cargando información de los archivos ....")
+        ana = controller.init()
+        optionTwo(ana)
     if int(inputs[0]) == 2:
     
     if int(inputs[0]) == 3:
