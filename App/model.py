@@ -31,35 +31,43 @@ from DISClib.ADT import list as lt
 from DISClib.ADT import map as m
 from DISClib.DataStructures import mapentry as me
 from DISClib.Algorithms.Sorting import shellsort as sa
+from DISClib.Algorithms.Graphs import scc
 from DISClib.Algorithms.Graphs import dijsktra as djk
 from DISClib.Utils import error as error
+from math import radians, cos, sin, asin, sqrt
 assert cf
 
 """
 Se define la estructura de un catálogo de videos. El catálogo tendrá dos listas, una para los videos, otra para las categorias de
 los mismos.
 """
-
-# Construccion de modelos
+#---------------------------------------------------------
+#               Construccion de modelos
+#---------------------------------------------------------
 
 def newAnalyzer():
     """ Inicializa el analizador
 
-   stops: Tabla de hash para guardar los vertices del grafo
-   connections: Grafo para representar las rutas entre estaciones
-   components: Almacena la informacion de los componentes conectados
-   paths: Estructura que almancena los caminos de costo minimo desde un
+    points: Tabla de hash para guardar los vertices del grafo
+    connections: Grafo para representar los cables entre landing points
+    components: Almacena la informacion de los componentes conectados
+    countries: Tabla de hash para guardar información de los países y sus capitales
+    paths: Estructura que almancena los caminos de costo minimo desde un
            vertice determinado a todos los otros vértices del grafo
+    relatedVertex: Tabla de hash que toma como llave el codigo de un landing point y 
+                   guarda una lista con todos los vertices asociados
     """
     try:
         analyzer = {
-                    'cities': None,
-                    'cables': None,
+                    'points': None,
+                    'connections': None,
+                    'components': None,
                     'countries': None,
-                    'paths': None
+                    'paths': None,
+                    'relatedVertex':None
                     }
 
-        analyzer['points'] = m.newMap(numelements=14000,
+        analyzer['points'] = m.newMap(numelements=1400,
                                      maptype='PROBING',
                                      comparefunction=compareStopIds)
 
@@ -70,120 +78,178 @@ def newAnalyzer():
         analyzer['countries'] = m.newMap(numelements=300, 
                                      maptype='PROBING',
                                      comparefunction=compareCountries)
+        analyzer['relatedVertex'] = m.newMap(numelements=14000,
+                                     maptype='PROBING',
+                                     comparefunction=compareStopIds)
         return analyzer
     except Exception as exp:
         error.reraise(exp, 'model:newAnalyzer')
 
-# Funciones para agregar informacion al catalogo
+#---------------------------------------------------------
+#   Funciones para agregar informacion al catalogo
+#---------------------------------------------------------
 
+def addLPoint(analyzer, point):
+    """
+    Adiciona un landing point a la tabla de hash de puntos
+    """
+    cable_id = point['landing_point_id']
+    m.put(analyzer['points'],cable_id,point)
+    return analyzer
+
+def addCountry(analyzer, country):
+    """
+    Adiciona un pais a la tabla de hash countries
+    """
+    countryName = country['CountryName']
+    m.put(analyzer['countries'],countryName,country)
+    return analyzer
 
 def addLandConnection(analyzer, connection):
     """
-    Adiciona las estaciones al grafo como vertices y arcos entre las
-    estaciones adyacentes.
+    Adiciona los vértices al grafo con el formato:
+    código*nombre_del_cable
 
-    Los vertices tienen por nombre el identificador de la estacion
-    seguido de la ruta que sirve.  Por ejemplo:
+    Añade conexiones entre los vértices tomando como peso
+    la distancia entre los 2 puntos calculada con la 
+    función de haversine
 
-    75009-10
-
-    Si la estacion sirve otra ruta, se tiene: 75009-101
+    Guarda los vértices con el mismo código inicial
+    en el mapa relatedVertex
     """
-    print(connection)
+    congr = analyzer['connections'] #connections graph = congr
+    rela = analyzer['relatedVertex']
+    points = analyzer['points']
     try:
-        origin = connection['origin']
+        origin = connection['\ufefforigin']
+        oriKey = m.get(points,origin)
+        oriPoint = me.getValue(oriKey)
+        verOrigin = formatVertex(connection,'\ufefforigin')
+        gr.insertVertex(congr,verOrigin)
         destination = connection['destination']
-        distance = float(connection['cable_length'])
-        addConnection(analyzer, origin, destination, distance)
-        #addRouteStop(analyzer, service)
-        #addRouteStop(analyzer, lastservice)
+        destKey = m.get(points,destination) 
+        destPoint = me.getValue(destKey)
+        verDest = formatVertex(connection,'destination')
+        gr.insertVertex(congr,verDest)
+        distance = haversine(oriPoint,destPoint)
+        addConnection(congr, verOrigin,verDest , distance)
+        esta = m.get(rela,origin)
+        if esta is not None:
+            lista = me.getValue(esta)
+            lt.addLast(lista,verOrigin)
+        else:
+            listaVertex = lt.newList(datastructure='ARRAY_LIST')
+            lt.addLast(listaVertex,verOrigin)
+            m.put(rela,origin,listaVertex)
         return analyzer
     except Exception as exp:
         error.reraise(exp, 'model:addLandConnection')
 
-
-def addCity(analyzer, point):
+def addConnection(congr, origin, destination, distance):
     """
-    Adiciona una estación como un vertice del grafo
+    Adiciona un arco entre dos Landing Points
     """
-    cable_id = point['landing_point_id']
-    m.put(analyzer['points'],cable_id,point)
-    try:
-        if not gr.containsVertex(analyzer['connections'],cable_id):
-            gr.insertVertex(analyzer['connections'], cable_id)
-        return analyzer
-    except Exception as exp:
-        error.reraise(exp, 'model:addcity')
-
-
-def addRouteStop(analyzer, service):
-    """
-    Agrega a una estacion, una ruta que es servida en ese paradero
-    """
-    entry = m.get(analyzer['stops'], service['BusStopCode'])
-    if entry is None:
-        lstroutes = lt.newList(cmpfunction=compareroutes)
-        lt.addLast(lstroutes, service['ServiceNo'])
-        m.put(analyzer['stops'], service['BusStopCode'], lstroutes)
-    else:
-        lstroutes = entry['value']
-        info = service['ServiceNo']
-        if not lt.isPresent(lstroutes, info):
-            lt.addLast(lstroutes, info)
-    return analyzer
-
-
-def addRouteConnections(analyzer):
-    """
-    Por cada vertice (cada estacion) se recorre la lista
-    de rutas servidas en dicha estación y se crean
-    arcos entre ellas para representar el cambio de ruta
-    que se puede realizar en una estación.
-    """
-    lststops = m.keySet(analyzer['stops'])
-    for key in lt.iterator(lststops):
-        lstroutes = m.get(analyzer['stops'], key)['value']
-        prevrout = None
-        for route in lt.iterator(lstroutes):
-            route = key + '-' + route
-            if prevrout is not None:
-                addConnection(analyzer, prevrout, route, 0)
-                addConnection(analyzer, route, prevrout, 0)
-            prevrout = route
-
-
-def addConnection(analyzer, origin, destination, distance):
-    """
-    Adiciona un arco entre dos estaciones
-    """
-    edge = gr.getEdge(analyzer['connections'], origin, destination)
+    edge = gr.getEdge(congr, origin, destination)
     if edge is None:
-        gr.addEdge(analyzer['connections'], origin, destination, distance)
+        gr.addEdge(congr, origin, destination, distance)
+    return congr
+
+def connectLocalVertex(analyzer):
+    '''
+    conecta los vertices con un mismo código entre sí
+    y con la ciudad capital de su país
+    '''
+    connectSameCode(analyzer)
+    connectSameCapital(analyzer)
     return analyzer
 
-# Funciones para creacion de datos
+def connectSameCode(analyzer):
+    rela = analyzer['relatedVertex']
+    congr = analyzer['connections']
+    codes = m.keySet(rela)
+    size = lt.size(codes)
+    for i in range(0,size):
+        key = lt.getElement(codes,i)
+        entry = m.get(rela,key)
+        codeList = me.getValue(entry)
+        codeSize = lt.size(codeList)
+        if codeSize >1:
+            for j in range(0,codeSize):
+                if j+1 <= codeSize:
+                    vertex = lt.getElement(codeList,j)
+                    nextVertex = lt.getElement(codeList,j+1)
+                    gr.addEdge(congr,vertex,nextVertex,0.1)
+            first = lt.firstElement(codeList)
+            last = lt.lastElement(codeList)
+            gr.addEdge(congr,last,first,0.1)
+    return analyzer
 
-def cleanServiceDistance(lastservice, service):
-    """
-    En caso de que el archivo tenga un espacio en la
-    distancia, se reemplaza con cero.
-    """
-    if service['Distance'] == '':
-        service['Distance'] = 0
-    if lastservice['Distance'] == '':
-        lastservice['Distance'] = 0
+def connectSameCapital(analyzer):
+    rela = analyzer['relatedVertex']
+    congr = analyzer['connections']
+    countries = analyzer['countries']
+    points = analyzer['points']
+    codes = m.keySet(rela)
+    size = lt.size(codes)
+    for i in range(0,size):
+        key = lt.getElement(codes,i)
+        landPoint = me.getValue(m.get(points,key))
+        location = landPoint['name']
+        city_country = location.split(',')
+        if len(city_country) == 1:
+            country = city_country[0]
+        else:
+            country = city_country[1]
+        country = country.strip()
+        countryEntry = m.get(countries,country)
+        if countryEntry is not None:
+            countryInfo = me.getValue(countryEntry)
+            capital = countryInfo['CapitalName']
+            gr.insertVertex(congr,capital)
+            cap_lat = countryInfo['CapitalLatitude']
+            cap_lon = countryInfo['CapitalLongitude']
+            cap = {'latitude':cap_lat,'longitude':cap_lon}
+            entry = m.get(rela,key)
+            codeList = me.getValue(entry)
+            codeSize = lt.size(codeList)
+            distance = haversine(cap,landPoint)
+            for j in range(0,codeSize):
+                vertex = lt.getElement(codeList,j)
+                gr.addEdge(congr,capital,vertex,distance) 
+    return analyzer
 
+#---------------------------------------------------------
+#           Funciones para creacion de datos
+#---------------------------------------------------------
 
-def formatVertex(connection):
+def formatVertex(connection,orde):
     """
-    Se formatea el nombrer del vertice con el id de la estación
-    seguido de la ruta.
+    Se formatea el nombrer del vertice con el id del landing point
+    seguido del nombre del cable
     """
-    name = connecion['BusStopCode'] + '-'
-    name = name + connection['ServiceNo']
+    name = connection[orde] + '*'
+    name = name + connection['cable_name']
     return name
     
+def haversine(oriPoint,destPoint):
+    latOri = float(oriPoint['latitude'])
+    lonOri = float(oriPoint['longitude'])
+    latDest = float(destPoint['latitude'])
+    lonDest = float(destPoint['longitude'])
+    
+    latOri,lonOri,latDest,lonDest = map(radians,[latOri,lonOri,latDest,lonDest])
+
+    dlon = lonDest - lonOri
+    dlat = latDest - latOri
+    a = sin(dlat/2)**2 + cos(latOri)*cos(latDest)*sin(dlon/2)**2
+    r = 6399.594
+    d = 2*r*asin(sqrt(a))
+    dist = round(d)
+    return dist
+
+#---------------------------------------------------------
 # Funciones de consulta
+#---------------------------------------------------------
 
 def connectedComponents(analyzer):
     """
@@ -221,7 +287,7 @@ def minimumCostPath(analyzer, destStation):
     return path
 
 
-def totalStops(analyzer):
+def totalLandingPoints(analyzer):
     """
     Retorna el total de estaciones (vertices) del grafo
     """
@@ -252,7 +318,9 @@ def servedRoutes(analyzer):
             maxdeg = degree
     return maxvert, maxdeg
 
+#-----------------------------------------------------------------
 # Funciones utilizadas para comparar elementos dentro de una lista
+#-----------------------------------------------------------------
 
 def compareStopIds(stop, keyvaluestop):
     """
@@ -279,6 +347,15 @@ def compareroutes(route1, route2):
         return -1
 
 def compareCountries(country1,country2):
-    pass
-# Funciones de ordenamiento
+    country2 = country2['key']
+    if (country1 == country2):
+        return 0
+    elif (country1 > country2):
+        return 1
+    else:
+        return -1
+
+#---------------------------------------------------------
+#               Funciones de ordenamiento
+#---------------------------------------------------------
 

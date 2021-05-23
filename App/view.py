@@ -23,6 +23,7 @@
 import config as cf
 import sys
 import controller
+import threading
 from DISClib.ADT import list as lt
 assert cf
 
@@ -34,17 +35,20 @@ se hace la solicitud al controlador para ejecutar la
 operación solicitada
 """
 
+initialStation = None
+
 def printMenu():
     print("Bienvenido")
     print("1- Cargar información en el catálogo")
     print("2- ")
 
 def optionTwo(cont):
-    controller.loadPoints(cont, 'landing_points.csv')
-    controller.loadConnections(cont,'connections.csv')
-    controller.loadCountries(cont,'countries.csv')
+    '''
+    Carga la información en el analizador
+    '''
+    controller.loadAnalyzerData(cont)
     numedges = controller.totalConnections(cont)
-    numvertex = controller.totalStops(cont)
+    numvertex = controller.totalLandingPoints(cont)
     print('Numero de vertices: ' + str(numvertex))
     print('Numero de arcos: ' + str(numedges))
     #print('El limite de recursion actual: ' + str(sys.getrecursionlimit()))
@@ -86,24 +90,40 @@ catalog = None
 """
 Menu principal
 """
-while True:
-    printMenu()
-    inputs = input('Seleccione una opción para continuar\n')
-    if int(inputs[0]) == 1:
-        print("Cargando información de los archivos ....")
-        ana = controller.init()
-        optionTwo(ana)
-    if int(inputs[0]) == 2:
-    
-    if int(inputs[0]) == 3:
-        
-    if int(inputs[0]) == 4:
-    
-    if int(inputs[0]) == 5:
+def thread_cycle():
+    while True:
+        printMenu()
+        inputs = input('Seleccione una opción para continuar\n>')
 
-    elif int(inputs[0]) == 2:
-        pass
+        if int(inputs[0]) == 1:
+            print("Cargando información de los archivos ....")
+            ana = controller.init()
+            optionTwo(ana)
 
-    else:
-        sys.exit(0)
-sys.exit(0)
+        elif int(inputs[0]) == 2:
+            pass
+
+        elif int(inputs[0]) == 3:
+            pass
+
+        elif int(inputs[0]) == 4:
+            pass
+
+        elif int(inputs[0]) == 5:
+            pass
+
+        elif int(inputs[0]) == 6:
+            pass
+            
+        elif int(inputs[0]) == 7:
+            pass
+
+        else:
+            sys.exit(0)
+    sys.exit(0)
+
+if __name__ == "__main__":
+    threading.stack_size(67108864)  # 64MB stack
+    sys.setrecursionlimit(2 ** 20)
+    thread = threading.Thread(target=thread_cycle)
+    thread.start()
