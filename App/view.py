@@ -25,6 +25,8 @@ import sys
 import controller
 import threading
 from DISClib.ADT import list as lt
+from DISClib.ADT import map as m
+from DISClib.DataStructures import mapentry as me
 assert cf
 
 
@@ -49,6 +51,24 @@ def optionTwo(cont):
     controller.loadAnalyzerData(cont)
     numedges = controller.totalConnections(cont)
     numvertex = controller.totalLandingPoints(cont)
+    points = cont['points']
+    pointKeys = m.keySet(points)
+    numLPoints = lt.size(pointKeys)
+    primKey = lt.firstElement(pointKeys)
+    primLPoint = me.getValue(m.get(points,primKey))
+    primLine = 'El primer Landing Point cargado es {}, identificado con el id {}, de latitud {} y longitud {}'.format\
+        (primLPoint['name'],primLPoint['landing_point_id'],primLPoint['latitude'],primLPoint['longitude'])
+    countries = cont['countries']
+    contKeys = m.keySet(countries)
+    numCountries = lt.size(contKeys)
+    lastContKey = lt.lastElement(contKeys)
+    lastCont = me.getValue(m.get(countries,lastContKey))
+    secLine = 'El último país cargado es {}, con una población de {} y su número de usuarios de Internet es de {}'.format\
+        (lastCont['CountryName'],lastCont['Population'],lastCont['Internet users'])
+    print('Numero de Landing Points '+ str(numLPoints))
+    print(primLine)
+    print('Numero de paises '+ str(numCountries))
+    print(secLine)
     print('Numero de vertices: ' + str(numvertex))
     print('Numero de arcos: ' + str(numedges))
     #print('El limite de recursion actual: ' + str(sys.getrecursionlimit()))
