@@ -91,6 +91,16 @@ def loadCountries(analyzer, servicesfile):
 def connectLocalVertex(analyzer):
     return model.connectLocalVertex(analyzer)
 
+def loadComponentGraphData(analyzer):
+    '''
+    Carga toda la información al catálogo
+    '''
+    loadPoints(analyzer,'landing_points.csv')
+    loadConnections(analyzer,'connections.csv')
+    loadCountries(analyzer,'countries.csv')
+    connectLocalVertex(analyzer)
+    return analyzer
+
 #---------------------------------------------------------
 #            Funciones de ordenamiento
 #---------------------------------------------------------
@@ -121,6 +131,11 @@ def connectedComponents(analyzer):
     """
     return model.connectedComponents(analyzer)
 
+def sameCluster(ana,lanPrim,lanSec):
+    return model.sameCluster(ana,lanPrim,lanSec)
+
+def greaterDegree(ana):
+    return model.greaterDegree(ana)
 
 def minimumCostPaths(analyzer, initialStation):
     """

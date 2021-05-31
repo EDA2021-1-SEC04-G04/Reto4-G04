@@ -151,36 +151,6 @@ def addLandConnection(analyzer, connection):
         return analyzer
     except Exception as exp:
         error.reraise(exp, 'model:addLandConnection')
-    
-def addLandConnection2(analyzer, connection):
-    """
-    Adiciona los vértices al grafo con el formato:
-    código*nombre_del_cable
-
-    Añade conexiones entre los vértices tomando como peso
-    la distancia entre los 2 puntos calculada con la 
-    función de haversine
-
-    Guarda los vértices con el mismo código inicial
-    en el mapa relatedVertex
-    """
-    congr = analyzer['componentsGraph'] #connections graph = congr
-    points = analyzer['points']
-    try:
-        origin = connection['\ufefforigin']
-        oriKey = m.get(points,origin)
-        oriPoint = me.getValue(oriKey)
-        gr.insertVertex(congr,origin)
-        destination = connection['destination']
-        destKey = m.get(points,destination) 
-        destPoint = me.getValue(destKey)
-        verDest = formatVertex(connection,'destination')
-        gr.insertVertex(congr,destination)
-        distance = haversine(oriPoint,destPoint)
-        addConnection(congr, origin, destination, distance)
-        return analyzer
-    except Exception as exp:
-        error.reraise(exp, 'model:addLandConnection')
 
 def addConnection(congr, origin, destination, distance):
     """
@@ -293,7 +263,7 @@ def connectedComponents(analyzer):
     Calcula los componentes conectados del grafo
     Se utiliza el algoritmo de Kosaraju
     """
-    analyzer['components'] = scc.KosarajuSCC(analyzer['componentsGraph'])
+    analyzer['components'] = scc.KosarajuSCC(analyzer['connections'])
     return scc.connectedComponents(analyzer['components'])
 
 def sameCluster(ana,lanPrim,lanSec):
@@ -315,8 +285,42 @@ def sameCluster(ana,lanPrim,lanSec):
         if id1 != None and id2!=None:
             encontrados = True
         i += 1
-    relation = scc.stronglyConnected(ana['components'],id1,id2)
-    return relation
+    rela = ana['relatedVertex']
+    first = lt.firstElement(me.getValue(m.get(rela,id1)))
+    second = lt.firstElement(me.getValue(m.get(rela,id2)))
+    relation = scc.stronglyConnected(ana['components'],first,second)
+    return relation,id1,id2
+
+def greaterDegree(ana):
+    rela = ana['relatedVertex']
+    points = ana['points']
+    mayor = -1
+    llaves = []
+    keys = m.keySet(rela)
+    for i in range(0,lt.size(keys)):
+        key = lt.getElement(keys,i)
+        lista = me.getValue(m.get(rela,key))
+        size = lt.size(lista)
+        if size > mayor:
+            mayor = size
+            llaves = []
+            llaves.append(key)
+        elif size == mayor:
+            llaves.append(key)
+    mayores = lt.newList()
+    for llave in llaves:
+        info = me.getValue(m.get(points,llave))
+        location = info['name']
+        city_country = location.split(',')
+        if len(city_country) == 1:
+            country = city_country[0]
+        else:
+            country = city_country[1]
+        name = info['id']
+        retorno = name,country,llave
+        lt.addLast(mayores,retorno)
+    return mayores, mayor
+        
 
 def minimumCostPaths(analyzer, initialStation):
     """
