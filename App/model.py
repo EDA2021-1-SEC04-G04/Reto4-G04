@@ -35,12 +35,14 @@ from DISClib.Algorithms.Graphs import scc
 from DISClib.Algorithms.Graphs import dijsktra as djk
 from DISClib.Utils import error as error
 from math import radians, cos, sin, asin, sqrt
+import reprlib
 assert cf
 
 """
 Se define la estructura de un catálogo de videos. El catálogo tendrá dos listas, una para los videos, otra para las categorias de
 los mismos.
 """
+
 #---------------------------------------------------------
 #               Construccion de modelos
 #---------------------------------------------------------
@@ -64,7 +66,8 @@ def newAnalyzer():
                     'components': None,
                     'countries': None,
                     'paths': None,
-                    'relatedVertex':None
+                    'relatedVertex':None,
+                    'componentsGraph':None
                     }
 
         analyzer['points'] = m.newMap(numelements=1400,
@@ -81,6 +84,10 @@ def newAnalyzer():
         analyzer['relatedVertex'] = m.newMap(numelements=14000,
                                      maptype='PROBING',
                                      comparefunction=compareStopIds)
+        analyzer['componentsGraph'] = gr.newGraph(datastructure='ADJ_LIST',
+                                                  directed=False,
+                                                  size = 14000,
+                                                  comparefunction=compareStopIds)
         return analyzer
     except Exception as exp:
         error.reraise(exp, 'model:newAnalyzer')
@@ -141,6 +148,36 @@ def addLandConnection(analyzer, connection):
             listaVertex = lt.newList(datastructure='ARRAY_LIST')
             lt.addLast(listaVertex,verOrigin)
             m.put(rela,origin,listaVertex)
+        return analyzer
+    except Exception as exp:
+        error.reraise(exp, 'model:addLandConnection')
+    
+def addLandConnection2(analyzer, connection):
+    """
+    Adiciona los vértices al grafo con el formato:
+    código*nombre_del_cable
+
+    Añade conexiones entre los vértices tomando como peso
+    la distancia entre los 2 puntos calculada con la 
+    función de haversine
+
+    Guarda los vértices con el mismo código inicial
+    en el mapa relatedVertex
+    """
+    congr = analyzer['componentsGraph'] #connections graph = congr
+    points = analyzer['points']
+    try:
+        origin = connection['\ufefforigin']
+        oriKey = m.get(points,origin)
+        oriPoint = me.getValue(oriKey)
+        gr.insertVertex(congr,origin)
+        destination = connection['destination']
+        destKey = m.get(points,destination) 
+        destPoint = me.getValue(destKey)
+        verDest = formatVertex(connection,'destination')
+        gr.insertVertex(congr,destination)
+        distance = haversine(oriPoint,destPoint)
+        addConnection(congr, origin, destination, distance)
         return analyzer
     except Exception as exp:
         error.reraise(exp, 'model:addLandConnection')
@@ -256,9 +293,30 @@ def connectedComponents(analyzer):
     Calcula los componentes conectados del grafo
     Se utiliza el algoritmo de Kosaraju
     """
-    analyzer['components'] = scc.KosarajuSCC(analyzer['connections'])
+    analyzer['components'] = scc.KosarajuSCC(analyzer['componentsGraph'])
     return scc.connectedComponents(analyzer['components'])
 
+def sameCluster(ana,lanPrim,lanSec):
+    id1 = None
+    id2 = None
+    keys = m.keySet(ana['points'])
+    size = lt.size(keys)
+    encontrados = False
+    i = 0
+    while i < size and encontrados==False:
+        key = lt.getElement(keys,i)
+        info = me.getValue(m.get(ana['points'],key))
+        name = info['name']
+        city = name.split(',')[0]
+        if city == lanPrim:
+            id1 = info['landing_point_id']
+        elif city == lanSec:
+            id2 = info['landing_point_id']
+        if id1 != None and id2!=None:
+            encontrados = True
+        i += 1
+    relation = scc.stronglyConnected(ana['components'],id1,id2)
+    return relation
 
 def minimumCostPaths(analyzer, initialStation):
     """
