@@ -42,9 +42,11 @@ initialStation = None
 def printMenu():
     print("Bienvenido")
     print("1- Cargar información en el catálogo")
-    print("2- ")
+    print("2- Encontrar componentes conectados")
+    print("3- Encontrar los Landing Points que sirven como punto de interconexión a más cables en la red")
 
-def optionTwo(cont):
+
+def optionOne(cont):
     '''
     Carga la información en el analizador
     '''
@@ -74,10 +76,34 @@ def optionTwo(cont):
     #print('El limite de recursion actual: ' + str(sys.getrecursionlimit()))
 
 
-def optionThree(cont):
+def optionTwo(cont):
     print('El número de componentes conectados es: ' +
           str(controller.connectedComponents(cont)))
+    print('Escriba el nombre de los landing points sobre los que quiere saber si se encuentran en el mismo clúster')
+    lanPrim = input('Primer Landing Point: ')
+    lanPrim = lanPrim.title()
+    lanSec = input('Segundo Landing Point: ')
+    lanSec = lanSec.title()
+    relation = controller.sameCluster(cont,lanPrim,lanSec)
+    sino = None
+    if relation[0] == False:
+        sino = 'no'
+    if relation[0] == True:
+        sino = 'sí'
+    linea = 'Los Landing Points {} identificado con {} y {} con id {} {} están en el mismo clúster'.format(lanPrim,relation[1],lanSec,relation[2],sino)
+    print(linea)
 
+def optionThree(cont):
+    answer = controller.greaterDegree(cont)
+    infoLPoint = answer[0]
+    numCables = answer [1]
+    size = lt.size(infoLPoint)
+    print('Los landing points que sirven como punto de interoncexión a más cables en la red son:')
+    for i in range(0,size):
+        element = lt.getElement(infoLPoint,i)
+        linea = '{} de{} con id {}'.format(element[0],element[1],element[2])
+        print(linea)
+    print('Con {} cables conectados'.format(numCables))
 
 def optionFour(cont, initialStation):
     controller.minimumCostPaths(cont, initialStation)
@@ -118,13 +144,13 @@ def thread_cycle():
         if int(inputs[0]) == 1:
             print("Cargando información de los archivos ....")
             ana = controller.init()
-            optionTwo(ana)
+            optionOne(ana)
 
         elif int(inputs[0]) == 2:
-            pass
+            optionTwo(ana)
 
         elif int(inputs[0]) == 3:
-            pass
+            optionThree(ana)
 
         elif int(inputs[0]) == 4:
             pass
