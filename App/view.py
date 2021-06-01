@@ -37,13 +37,16 @@ se hace la solicitud al controlador para ejecutar la
 operación solicitada
 """
 
-initialStation = None
+initialLPoint = None
 
 def printMenu():
     print("Bienvenido")
     print("1- Cargar información en el catálogo")
     print("2- Encontrar componentes conectados")
     print("3- Encontrar los Landing Points que sirven como punto de interconexión a más cables en la red")
+    print("4- Definir el país base")
+    print("5- Calcular el camino más corto entre el país base y otro país")
+    print("0- Salir")
 
 
 def optionOne(cont):
@@ -105,11 +108,33 @@ def optionThree(cont):
         print(linea)
     print('Con {} cables conectados'.format(numCables))
 
-def optionFour(cont, initialStation):
-    controller.minimumCostPaths(cont, initialStation)
+def optionFour(cont):
+    msg = "País base: "
+    country = input(msg)
+    countries = cont['countries']
+    initialLPoint = me.getValue(m.get(countries,country))['CapitalName']
+    controller.minimumCostPaths(cont, initialLPoint)
 
+def optionFive(cont):
+    country = input('Ingrese el país destino: ')
+    countries = cont['countries']
+    final = me.getValue(m.get(countries,country))['CapitalName']
+    path = controller.minimumCostPath(cont,final)
+    inicial = lt.firstElement(path)['vertexA']
+    final = lt.lastElement(path)['vertexB']
+    print('Para llegar desde {} hasta {} hay que tomar el camino:'.format(inicial,final))
+    distTotal = 0
+    for i in range(0,lt.size(path)):
+        camino = lt.getElement(path,i)
+        punto = camino['vertexB']
+        distancia = camino['weight']
+        distTotal += distancia
+        linea = '{}: {}km'.format(punto,distancia)
+        print(linea)
+    distTotal = round(distTotal,2)
+    print('Con una distancia total de {}km'.format(distTotal))
 
-def optionFive(cont, destStation):
+def optionSix(cont, destStation):
     haspath = controller.hasPath(cont, destStation)
     print('Hay camino entre la estación base : ' +
           'y la estación: ' + destStation + ': ')
@@ -153,10 +178,10 @@ def thread_cycle():
             optionThree(ana)
 
         elif int(inputs[0]) == 4:
-            pass
+            optionFour(ana)                
 
         elif int(inputs[0]) == 5:
-            pass
+            optionFive(ana)
 
         elif int(inputs[0]) == 6:
             pass
