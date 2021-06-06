@@ -40,13 +40,19 @@ operación solicitada
 initialLPoint = None
 
 def printMenu():
+    print("*"*70)
     print("Bienvenido")
     print("1- Cargar información en el catálogo")
     print("2- Encontrar componentes conectados")
     print("3- Encontrar los Landing Points que sirven como punto de interconexión a más cables en la red")
     print("4- Definir el país base")
     print("5- Calcular el camino más corto entre el país base y otro país")
+    print("6- Calcular el árbol de expansión mínimo")
+    print("7- Calcular el impacto del un Landing Point")
+    print("8- Calcular el máximo ancho de banda para un país con un cable específico")
+    print("9- IP")
     print("0- Salir")
+    print("*"*70)
 
 
 def optionOne(cont):
@@ -104,9 +110,8 @@ def optionThree(cont):
     print('Los landing points que sirven como punto de interoncexión a más cables en la red son:')
     for i in range(0,size):
         element = lt.getElement(infoLPoint,i)
-        linea = '{} de{} con id {}'.format(element[0],element[1],element[2])
+        linea = '{} de {} con {} conexiones'.format(element[0],element[1],numCables)
         print(linea)
-    print('Con {} cables conectados'.format(numCables))
 
 def optionFour(cont):
     msg = "País base: "
@@ -134,27 +139,28 @@ def optionFive(cont):
     distTotal = round(distTotal,2)
     print('Con una distancia total de {}km'.format(distTotal))
 
-def optionSix(cont, destStation):
-    haspath = controller.hasPath(cont, destStation)
-    print('Hay camino entre la estación base : ' +
-          'y la estación: ' + destStation + ': ')
-    print(haspath)
+def optionSix(cont):
+    answer = controller.minimumSpanningTree(cont)
+    print('El número total de nodos conectados a la red de expansión mínima es '+str(answer[1])+' y '\
+        'la distancia para recorrerlos es de '+str(answer[0])+'km')
     
-def optionSix(cont, destStation):
-    path = controller.minimumCostPath(cont, destStation)
-    if path is not None:
-        pathlen = stack.size(path)
-        print('El camino es de longitud: ' + str(pathlen))
-        while (not stack.isEmpty(path)):
-            stop = stack.pop(path)
-            print(stop)
-    else:
-        print('No hay camino')
-
 def optionSeven(cont):
-    maxvert, maxdeg = controller.servedRoutes(cont)
-    print('Estación: ' + maxvert + '  Total rutas servidas: '
-          + str(maxdeg))
+    vertex = input('Ingrese el nombre del Landing Point para hacer la consulta: ')
+    countryList = controller.impact(cont,vertex)
+    size = lt.size(countryList)
+    print('Los países que se verían afectados por la caída del Landing Point '+vertex+ ' son '+ str(size)+':')
+    for i in range(1,size+1):
+        country = lt.getElement(countryList,i)
+        print(country[0]+' con una distancia de '+str(country[1]))
+
+def optionEight(cont):
+    country = input('Escriba el nombre del país: ')
+    cable = input('Escriba el nombre del cable: ')
+    answer = controller.cable(cont,country,cable)
+    print('Los países conectados con '+country+' a través del cable '+cable+' son:')
+    for i in range(0,lt.size(answer)):
+        place = lt.getElement(answer,i)
+        print('{} - se puede asegurar un ancho de banda de {}Mbps'.format(place[0],place[1]))
 
 catalog = None
 
@@ -184,10 +190,13 @@ def thread_cycle():
             optionFive(ana)
 
         elif int(inputs[0]) == 6:
-            pass
+            optionSix(ana)
             
         elif int(inputs[0]) == 7:
-            pass
+            optionSeven(ana)
+        
+        elif int(inputs[0]) == 8:
+            optionEight(ana)
 
         else:
             sys.exit(0)
