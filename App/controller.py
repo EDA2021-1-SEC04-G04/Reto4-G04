@@ -52,6 +52,7 @@ def loadAnalyzerData(analyzer):
     loadConnections(analyzer,'connections.csv')
     loadCountries(analyzer,'countries.csv')
     connectLocalVertex(analyzer)
+    #model.test(analyzer)
     return analyzer
 
 def loadPoints(analyzer, servicesfile):
@@ -59,7 +60,7 @@ def loadPoints(analyzer, servicesfile):
     Carga los datos del archivo Landing Points CSV en el modelo.
     """
     servicesfile = cf.data_dir + servicesfile
-    input_file = csv.DictReader(open(servicesfile, encoding="utf-8"),
+    input_file = csv.DictReader(open(servicesfile, encoding="utf-8-sig"),
                                 delimiter=",")
     for point in input_file:
         model.addLPoint(analyzer,point)
@@ -71,10 +72,11 @@ def loadConnections(analyzer, servicesfile):
     Se crea un arco entre cada punto de origen y destino
     """
     servicesfile = cf.data_dir + servicesfile
-    input_file = csv.DictReader(open(servicesfile, encoding="utf-8"),
+    input_file = csv.DictReader(open(servicesfile, encoding="utf-8-sig"),
                                 delimiter=",")
     for connection in input_file:
         model.addLandConnection(analyzer,connection)
+        model.addCable(analyzer,connection)
     return analyzer
 
 def loadCountries(analyzer, servicesfile):
@@ -82,7 +84,7 @@ def loadCountries(analyzer, servicesfile):
     Carga los datos del archivo Countries CSV en el modelo.
     """
     servicesfile = cf.data_dir + servicesfile
-    input_file = csv.DictReader(open(servicesfile, encoding="utf-8"),
+    input_file = csv.DictReader(open(servicesfile, encoding="utf-8-sig"),
                                 delimiter=",")
     for country in input_file:
         model.addCountry(analyzer,country)
@@ -137,32 +139,24 @@ def sameCluster(ana,lanPrim,lanSec):
 def greaterDegree(ana):
     return model.greaterDegree(ana)
 
-def minimumCostPaths(analyzer, initialStation):
+def minimumCostPaths(analyzer, initialCapital):
     """
     Calcula todos los caminos de costo minimo de initialStation a todas
     las otras estaciones del sistema
     """
-    return model.minimumCostPaths(analyzer, initialStation)
+    return model.minimumCostPaths(analyzer, initialCapital)
 
-
-def hasPath(analyzer, destStation):
-    """
-    Informa si existe un camino entre initialStation y destStation
-    """
-    return model.hasPath(analyzer, destStation)
-
-
-def minimumCostPath(analyzer, destStation):
+def minimumCostPath(analyzer, destPoint):
     """
     Retorna el camino de costo minimo desde initialStation a destStation
     """
-    return model.minimumCostPath(analyzer, destStation)
+    return model.minimumCostPath(analyzer, destPoint)
 
+def minimumSpanningTree(ana):
+    return model.minimumSpanningTree(ana)
 
-def servedRoutes(analyzer):
-    """
-    Retorna el camino de costo minimo desde initialStation a destStation
-    """
-    maxvert, maxdeg = model.servedRoutes(analyzer)
-    return maxvert, maxdeg
-    
+def impact(ana,vertex):
+    return model.impact(ana,vertex)
+
+def cable(ana,country,cable):
+    return model.cable(ana,country,cable)

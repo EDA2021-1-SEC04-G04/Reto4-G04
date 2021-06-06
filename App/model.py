@@ -25,6 +25,7 @@
  """
 
 
+from DISClib.DataStructures.chaininghashtable import keySet
 import config as cf
 from DISClib.ADT.graph import gr
 from DISClib.ADT import list as lt
@@ -33,6 +34,8 @@ from DISClib.DataStructures import mapentry as me
 from DISClib.Algorithms.Sorting import shellsort as sa
 from DISClib.Algorithms.Graphs import scc
 from DISClib.Algorithms.Graphs import dijsktra as djk
+from DISClib.Algorithms.Graphs import prim as prim
+from DISClib.Algorithms.Sorting import mergesort as mrg
 from DISClib.Utils import error as error
 from math import radians, cos, sin, asin, sqrt
 import reprlib
@@ -67,7 +70,8 @@ def newAnalyzer():
                     'countries': None,
                     'paths': None,
                     'relatedVertex':None,
-                    'componentsGraph':None
+                    'componentsGraph':None,
+                    'cables':None
                     }
 
         analyzer['points'] = m.newMap(numelements=1400,
@@ -88,6 +92,9 @@ def newAnalyzer():
                                                   directed=False,
                                                   size = 14000,
                                                   comparefunction=compareStopIds)
+        analyzer['cables'] = m.newMap(numelements=14000,
+                                    maptype='PROBING',
+                                    comparefunction=compareCountries)
         return analyzer
     except Exception as exp:
         error.reraise(exp, 'model:newAnalyzer')
@@ -128,22 +135,21 @@ def addLandConnection(analyzer, connection):
     rela = analyzer['relatedVertex']
     points = analyzer['points']
     try:
-        origin = connection['\ufefforigin']
-        oriKey = m.get(points,origin)
-        oriPoint = me.getValue(oriKey)
-        verOrigin = formatVertex(connection,'\ufefforigin')
-        gr.insertVertex(congr,verOrigin)
+        origin = connection['origin']
+        oriPoint = me.getValue(m.get(points,origin))
+        verOrigin = formatVertex(connection,'origin')
+        addVertex(congr,verOrigin)
         destination = connection['destination']
-        destKey = m.get(points,destination) 
-        destPoint = me.getValue(destKey)
+        destPoint = me.getValue(m.get(points,destination))
         verDest = formatVertex(connection,'destination')
-        gr.insertVertex(congr,verDest)
+        addVertex(congr,verDest)
         distance = haversine(oriPoint,destPoint)
         addConnection(congr, verOrigin,verDest , distance)
         esta = m.get(rela,origin)
         if esta is not None:
             lista = me.getValue(esta)
-            lt.addLast(lista,verOrigin)
+            if lt.isPresent(lista,verOrigin)==False:
+                lt.addLast(lista,verOrigin)
         else:
             listaVertex = lt.newList(datastructure='ARRAY_LIST')
             lt.addLast(listaVertex,verOrigin)
@@ -151,6 +157,22 @@ def addLandConnection(analyzer, connection):
         return analyzer
     except Exception as exp:
         error.reraise(exp, 'model:addLandConnection')
+'''
+def test(ana):
+    congr = ana['connections']
+    rela = ana['relatedVertex']
+    edge = gr.getEdge(congr,'3347*America Movil Submarine Cable System-1 (AMX-1)','5693*America Movil Submarine Cable System-1 (AMX-1)')
+    print(edge)
+    l = me.getValue(m.get(rela,'3347'))
+    print(l)
+    ady = gr.adjacents(congr,lt.getElement(l,0))
+    print(ady)
+'''
+
+def addVertex(congr,vertex):
+    vert = gr.containsVertex(congr,vertex)
+    if vert == False:
+        gr.insertVertex(congr,vertex)
 
 def addConnection(congr, origin, destination, distance):
     """
@@ -159,7 +181,12 @@ def addConnection(congr, origin, destination, distance):
     edge = gr.getEdge(congr, origin, destination)
     if edge is None:
         gr.addEdge(congr, origin, destination, distance)
-    return congr
+
+def addCable(ana,connection):
+    cables = ana['cables']
+    cable = connection['cable_name']
+    if m.contains(cables,cable) == False:
+        m.put(cables,cable,connection['capacityTBPS'])
 
 def connectLocalVertex(analyzer):
     '''
@@ -185,7 +212,7 @@ def connectSameCode(analyzer):
                 if j+1 <= codeSize:
                     vertex = lt.getElement(codeList,j)
                     nextVertex = lt.getElement(codeList,j+1)
-                    gr.addEdge(congr,vertex,nextVertex,0.1)
+                    addConnection(congr,vertex,nextVertex,0.1)
             first = lt.firstElement(codeList)
             last = lt.lastElement(codeList)
             gr.addEdge(congr,last,first,0.1)
@@ -202,17 +229,14 @@ def connectSameCapital(analyzer):
         key = lt.getElement(codes,i)
         landPoint = me.getValue(m.get(points,key))
         location = landPoint['name']
-        city_country = location.split(',')
-        if len(city_country) == 1:
-            country = city_country[0]
-        else:
-            country = city_country[1]
+        country = location.split(',')[-1]
         country = country.strip()
         countryEntry = m.get(countries,country)
         if countryEntry is not None:
             countryInfo = me.getValue(countryEntry)
             capital = countryInfo['CapitalName']
-            gr.insertVertex(congr,capital)
+            if gr.containsVertex(congr,capital)==False:
+                gr.insertVertex(congr,capital)
             cap_lat = countryInfo['CapitalLatitude']
             cap_lon = countryInfo['CapitalLongitude']
             cap = {'latitude':cap_lat,'longitude':cap_lon}
@@ -222,7 +246,7 @@ def connectSameCapital(analyzer):
             distance = haversine(cap,landPoint)
             for j in range(0,codeSize):
                 vertex = lt.getElement(codeList,j)
-                gr.addEdge(congr,capital,vertex,distance) 
+                addConnection(congr,capital,vertex,distance) 
     return analyzer
 
 #---------------------------------------------------------
@@ -258,6 +282,19 @@ def haversine(oriPoint,destPoint):
 # Funciones de consulta
 #---------------------------------------------------------
 
+def totalLandingPoints(analyzer):
+    """
+    Retorna el total de estaciones (vertices) del grafo
+    """
+    return gr.numVertices(analyzer['connections'])
+
+
+def totalConnections(analyzer):
+    """
+    Retorna el total arcos del grafo
+    """
+    return gr.numEdges(analyzer['connections'])
+
 def connectedComponents(analyzer):
     """
     Calcula los componentes conectados del grafo
@@ -292,93 +329,196 @@ def sameCluster(ana,lanPrim,lanSec):
     return relation,id1,id2
 
 def greaterDegree(ana):
-    rela = ana['relatedVertex']
-    points = ana['points']
+    vertices = gr.vertices(ana['connections'])
+    countries = ana['countries']
+    keysCountries = m.keySet(countries)
     mayor = -1
     llaves = []
-    keys = m.keySet(rela)
-    for i in range(0,lt.size(keys)):
-        key = lt.getElement(keys,i)
-        lista = me.getValue(m.get(rela,key))
-        size = lt.size(lista)
-        if size > mayor:
-            mayor = size
-            llaves = []
-            llaves.append(key)
-        elif size == mayor:
-            llaves.append(key)
+    size = lt.size(vertices)
+    for i in range(0,size):
+        vertex = lt.getElement(vertices,i)
+        degree = gr.degree(ana['connections'],vertex)
+        if degree>mayor:
+            mayor = degree
+            llaves= []
+            llaves.append(vertex)
+        elif degree == mayor:
+            llaves.append(vertex)
     mayores = lt.newList()
     for llave in llaves:
-        info = me.getValue(m.get(points,llave))
-        location = info['name']
-        city_country = location.split(',')
-        if len(city_country) == 1:
-            country = city_country[0]
-        else:
-            country = city_country[1]
-        name = info['id']
-        retorno = name,country,llave
+        encontrado = False
+        i=0
+        while i<lt.size(keysCountries) and encontrado == False:
+            country = lt.getElement(keysCountries,i)
+            info = me.getValue(m.get(countries,country))
+            if info['CapitalName'] == llave:
+                encontrado = True
+            i+=1
+        retorno = llave,country
         lt.addLast(mayores,retorno)
     return mayores, mayor
-        
 
-def minimumCostPaths(analyzer, initialStation):
+def minimumCostPaths(analyzer, initialCapital):
     """
-    Calcula los caminos de costo mínimo desde la estacion initialStation
+    Calcula los caminos de costo mínimo desde la capital del país seleccionado
     a todos los demas vertices del grafo
     """
-    analyzer['paths'] = djk.Dijkstra(analyzer['connections'], initialStation)
+    analyzer['paths'] = djk.Dijkstra(analyzer['connections'], initialCapital)
     return analyzer
 
-
-def hasPath(analyzer, destStation):
+def minimumCostPath(analyzer, destCapital):
     """
-    Indica si existe un camino desde la estacion inicial a la estación destino
+    Retorna el camino de costo minimo entre la capital de inicio
+    y la capital destino
     Se debe ejecutar primero la funcion minimumCostPaths
     """
-    return djk.hasPathTo(analyzer['paths'], destStation)
-
-
-def minimumCostPath(analyzer, destStation):
-    """
-    Retorna el camino de costo minimo entre la estacion de inicio
-    y la estacion destino
-    Se debe ejecutar primero la funcion minimumCostPaths
-    """
-    path = djk.pathTo(analyzer['paths'], destStation)
+    path = djk.pathTo(analyzer['paths'], destCapital)
     return path
 
+r = reprlib.Repr()
+r.maxlist = 20
+r.maxstring = 20
+r.maxlevel = 20
 
-def totalLandingPoints(analyzer):
-    """
-    Retorna el total de estaciones (vertices) del grafo
-    """
-    return gr.numVertices(analyzer['connections'])
+def minimumSpanningTree(ana):
+    search = prim.PrimMST(ana['connections'])
+    relaxed = prim.prim(ana['connections'],search,'Bogota')
+    edges = prim.edgesMST(ana['connections'],search)
+    mst = relaxed['mst']
+    size = lt.size(mst)
+    '''
+    for i in range(0,size):
+        element = lt.getElement(mst,i)
+        print(element['phase'])
+    '''
+    weight = round(prim.weightMST(ana['connections'],relaxed),2)
+    return weight,size
 
+def impact(ana,vertex):
+    rela = ana['relatedVertex']
+    points = ana['points']
+    congr = ana['connections']
+    pointKeys = m.keySet(points)
+    j = 0
+    encontrado = False
+    while j<lt.size(pointKeys) and encontrado == False:
+        key = lt.getElement(pointKeys,j)
+        LPoint = me.getValue(m.get(points,key))
+        city = LPoint['name'].split(',')[0]
+        if vertex == city:
+            encontrado = True
+            id = LPoint['landing_point_id']
+        j+=1
+    vertices = me.getValue(m.get(rela,id))
+    countries = lt.newList(cmpfunction=compareDistance)
+    llaves = []
+    for i in range(0,lt.size(vertices)):
+        vert = lt.getElement(vertices,i)
+        adyList = gr.adjacents(congr,vert)
+        for k in range(0,lt.size(adyList)):
+            ady = lt.getElement(adyList,k)
+            initial = ady.split('*')[0]
+            try:
+                code = int(initial)
+                lPoint = me.getValue(m.get(points,str(code)))
+                country = lPoint['name'].split(',')[-1]
+                country = country.strip()
+                distance = gr.getEdge(congr,vert,ady)['weight']
+                info = country,distance
+                if country not in llaves:
+                    llaves.append(country)
+                    lt.addLast(countries,info)
+            except:
+                pass
+            
+    sorted = sortCountries(countries)
+    return sorted
 
-def totalConnections(analyzer):
-    """
-    Retorna el total arcos del grafo
-    """
-    return gr.numEdges(analyzer['connections'])
+def cable(ana,country,cable):
+    countries = ana['countries']
+    congr = ana['connections']
+    cables = ana['cables']
+    rela = ana['relatedVertex']
+    band = lt.newList(datastructure='ARRAY_LIST')
+    countryKeys = m.keySet(countries)
+    j = 0
+    found = False
+    while j<lt.size(countryKeys) and found == False:
+        key = lt.getElement(countryKeys,j)
+        info = me.getValue(m.get(countries,key))
+        Country = info['CountryName']
+        if country == Country:
+            found = True
+        j+=1
+    city = info['CapitalName']
+    tbps = float(me.getValue(m.get(cables,cable)))*1000000
+    adjacents = gr.adjacents(congr,city)
+    for i in range(0,lt.size(adjacents)):
+        adj = lt.getElement(adjacents,i)
+        cableName = adj.split('*')[1]
+        id = int(adj.split('*')[0])
+        if cable == cableName:
+            vertAdj = gr.adjacents(congr,adj)
+            for k in range(0,lt.size(vertAdj)):
+                vert = lt.getElement(vertAdj,k)
+                vertID = vert.split('*')[0]
+                vertId = int(vertID)
+                if id != vertId:
+                    otherEndAdj = gr.adjacents(congr,vert)
+                    for l in range(0,lt.size(otherEndAdj)):
+                        side = lt.getElement(otherEndAdj,l)
+                        sideAdj = gr.adjacents(congr,side)
+                        size = lt.size(sideAdj)
+                        for num in range(0,size):
+                            sideVert = lt.getElement(sideAdj,num+1)
+                            sideVertCode = sideVert.split('*')
+                            try:
+                                cableName2 = sideVertCode[1]
+                                if cable == cableName2:
+                                    adjacents2 = gr.adjacents(congr,sideVert)
+                                    for nu in range(0,lt.size(adjacents2)):
+                                        cap = lt.getElement(adjacents2,nu+1).split('*')
+                                        try:
+                                            int(cap[0])
+                                        except:
+                                            cap = cap[0]
+                                            if cap != 'Havana':
+                                                n = 0
+                                                found = False
+                                                while n < lt.size(countryKeys):
+                                                    key = lt.getElement(countryKeys,n)
+                                                    info = me.getValue(m.get(countries,key))
+                                                    Capital = info['CapitalName']
+                                                    if cap == Capital:
+                                                        found = True
+                                                        country = info['CountryName']
+                                                        users = float(info['Internet users'])
+                                                        capacity = round(tbps/users,3)
+                                                        save = country,capacity
+                                                        if lt.isPresent(band,save)==False:
+                                                            lt.addLast(band,save)
+                                                    n+=1
 
-
-def servedRoutes(analyzer):
-    """
-    Retorna la estación que sirve a mas rutas.
-    Si existen varias rutas con el mismo numero se
-    retorna una de ellas
-    """
-    lstvert = m.keySet(analyzer['stops'])
-    maxvert = None
-    maxdeg = 0
-    for vert in lt.iterator(lstvert):
-        lstroutes = m.get(analyzer['stops'], vert)['value']
-        degree = lt.size(lstroutes)
-        if(degree > maxdeg):
-            maxvert = vert
-            maxdeg = degree
-    return maxvert, maxdeg
+                            except:
+                                capital = sideVertCode[0]
+                                if capital != 'Havana':
+                                    n = 0
+                                    found = False
+                                    while n < lt.size(countryKeys):
+                                        key = lt.getElement(countryKeys,n)
+                                        info = me.getValue(m.get(countries,key))
+                                        Capital = info['CapitalName']
+                                        if capital == Capital:
+                                            found = True
+                                            country = info['CountryName']
+                                            users = float(info['Internet users'])
+                                            capacity = round(tbps/users,3)
+                                            save = country,capacity
+                                            if lt.isPresent(band,save)==False:
+                                                lt.addLast(band,save)
+                                        n+=1
+                                    
+    return band
 
 #-----------------------------------------------------------------
 # Funciones utilizadas para comparar elementos dentro de una lista
@@ -417,7 +557,15 @@ def compareCountries(country1,country2):
     else:
         return -1
 
+def compareDistance(country1,country2):
+    return country1[1] > country2[1]
+
 #---------------------------------------------------------
 #               Funciones de ordenamiento
 #---------------------------------------------------------
 
+def sortCountries(countries):
+    size = lt.size(countries)
+    sortedlist = lt.subList(countries, 1, size)
+    sublist = mrg.sort(sortedlist, compareDistance)
+    return sublist
