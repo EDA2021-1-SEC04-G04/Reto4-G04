@@ -119,18 +119,19 @@ def optionFour(cont):
     countries = cont['countries']
     initialLPoint = me.getValue(m.get(countries,country))['CapitalName']
     controller.minimumCostPaths(cont, initialLPoint)
+    return country
 
-def optionFive(cont):
+def optionFive(cont,ini):
     country = input('Ingrese el país destino: ')
     countries = cont['countries']
-    final = me.getValue(m.get(countries,country))['CapitalName']
-    path = controller.minimumCostPath(cont,final)
+    final = me.getValue(m.get(countries,country))
+    path = controller.minimumCostPath(cont,final,ini)
     inicial = lt.firstElement(path)['vertexA']
     final = lt.lastElement(path)['vertexB']
     print('Para llegar desde {} hasta {} hay que tomar el camino:'.format(inicial,final))
     distTotal = 0
     for i in range(0,lt.size(path)):
-        camino = lt.getElement(path,i)
+        camino = lt.getElement(path,i+1)
         punto = camino['vertexB']
         distancia = camino['weight']
         distTotal += distancia
@@ -184,10 +185,10 @@ def thread_cycle():
             optionThree(ana)
 
         elif int(inputs[0]) == 4:
-            optionFour(ana)                
+            ini = optionFour(ana)                
 
         elif int(inputs[0]) == 5:
-            optionFive(ana)
+            optionFive(ana,ini)
 
         elif int(inputs[0]) == 6:
             optionSix(ana)
