@@ -146,11 +146,11 @@ def minimumCostPaths(analyzer, initialCapital):
     """
     return model.minimumCostPaths(analyzer, initialCapital)
 
-def minimumCostPath(analyzer, destPoint):
+def minimumCostPath(analyzer, destPoint,ini):
     """
     Retorna el camino de costo minimo desde initialStation a destStation
     """
-    return model.minimumCostPath(analyzer, destPoint)
+    return model.minimumCostPath(analyzer, destPoint,ini)
 
 def minimumSpanningTree(ana):
     return model.minimumSpanningTree(ana)
@@ -160,3 +160,6 @@ def impact(ana,vertex):
 
 def cable(ana,country,cable):
     return model.cable(ana,country,cable)
+
+def IP(ana,ip1,ip2):
+    return model.IP(ana,ip1,ip2)

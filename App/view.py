@@ -50,7 +50,7 @@ def printMenu():
     print("6- Calcular el árbol de expansión mínimo")
     print("7- Calcular el impacto del un Landing Point")
     print("8- Calcular el máximo ancho de banda para un país con un cable específico")
-    print("9- IP")
+    print("9- Calcular recorrido mínimo entre 2 direcciones IP")
     print("0- Salir")
     print("*"*70)
 
@@ -163,6 +163,27 @@ def optionEight(cont):
         place = lt.getElement(answer,i)
         print('{} - se puede asegurar un ancho de banda de {}Mbps'.format(place[0],place[1]))
 
+def optionNine(cont):
+    Ip1 = input('Ingrese la primera dirección IP: ')
+    Ip2 = input('Ingrese la segunda dirección IP: ')
+    answer = controller.IP(cont,Ip1,Ip2)
+    path = answer[0]
+    point1 = answer[1]
+    point2 = answer[2]
+    print('El landing point más cercano a la dirección IP '+Ip1+' es '+point1)
+    print('El landing point más cercano a la dirección IP '+Ip2+' es '+point2)
+    print('El camino más corto entre '+point1+' y '+point2+' es:')
+    print(point1)
+    saltos = 0
+    for i in range(0,lt.size(path)):
+        camino = lt.getElement(path,i+1)
+        punto = camino['vertexB']
+        distancia = camino['weight']
+        saltos += 1
+        linea = '{}: {}km'.format(punto,distancia)
+        print(linea)
+    print('Con {} saltos en la ruta'.format(saltos))
+
 catalog = None
 
 """
@@ -199,6 +220,8 @@ def thread_cycle():
         elif int(inputs[0]) == 8:
             optionEight(ana)
 
+        elif int(inputs[0]) == 9:
+            optionNine(ana)
         else:
             sys.exit(0)
     sys.exit(0)

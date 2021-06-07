@@ -24,7 +24,6 @@
  * Dario Correal - Version inicial
  """
 
-
 from DISClib.DataStructures.chaininghashtable import keySet
 import config as cf
 from DISClib.ADT.graph import gr
@@ -38,6 +37,8 @@ from DISClib.Algorithms.Graphs import prim as prim
 from DISClib.Algorithms.Sorting import mergesort as mrg
 from DISClib.Utils import error as error
 from math import radians, cos, sin, asin, sqrt
+import folium
+import ipapi
 import reprlib
 assert cf
 
@@ -71,7 +72,8 @@ def newAnalyzer():
                     'paths': None,
                     'relatedVertex':None,
                     'componentsGraph':None,
-                    'cables':None
+                    'cables':None,
+                    'IPs':None
                     }
 
         analyzer['points'] = m.newMap(numelements=1400,
@@ -310,6 +312,7 @@ def sameCluster(ana,lanPrim,lanSec):
     size = lt.size(keys)
     encontrados = False
     i = 0
+    P = folium.Map()
     while i < size and encontrados==False:
         key = lt.getElement(keys,i)
         info = me.getValue(m.get(ana['points'],key))
@@ -317,11 +320,22 @@ def sameCluster(ana,lanPrim,lanSec):
         city = name.split(',')[0]
         if city == lanPrim:
             id1 = info['landing_point_id']
+            lat1 = info['latitude']
+            lon1 = info['longitude']
+            location1 = lat1,lon1
+            name1 = info['name']
+            folium.Marker(location1,name1).add_to(P)
         elif city == lanSec:
             id2 = info['landing_point_id']
+            lat2 = info['latitude']
+            lon2 = info['longitude']
+            name2 = info['name']
+            location2 = lat2,lon2
+            folium.Marker(location2,name2).add_to(P)
         if id1 != None and id2!=None:
             encontrados = True
         i += 1
+    P.save('cluster.html')
     rela = ana['relatedVertex']
     first = lt.firstElement(me.getValue(m.get(rela,id1)))
     second = lt.firstElement(me.getValue(m.get(rela,id2)))
@@ -329,8 +343,10 @@ def sameCluster(ana,lanPrim,lanSec):
     return relation,id1,id2
 
 def greaterDegree(ana):
-    vertices = gr.vertices(ana['connections'])
+    congr = ana['connections']
+    vertices = gr.vertices(congr)
     countries = ana['countries']
+    points = ana['points']
     keysCountries = m.keySet(countries)
     mayor = -1
     llaves = []
@@ -345,14 +361,32 @@ def greaterDegree(ana):
         elif degree == mayor:
             llaves.append(vertex)
     mayores = lt.newList()
+    M = folium.Map()
     for llave in llaves:
         encontrado = False
         i=0
         while i<lt.size(keysCountries) and encontrado == False:
             country = lt.getElement(keysCountries,i)
             info = me.getValue(m.get(countries,country))
-            if info['CapitalName'] == llave:
+            cap = info['CapitalName']
+            if cap == llave:
                 encontrado = True
+                lat = info['CapitalLatitude']
+                lon = info['CapitalLongitude']
+                loc = lat,lon
+                name = country+', '+cap
+                folium.Marker(loc,name,icon=folium.Icon(color='red',icon_color='white')).add_to(M)
+                adj = gr.adjacents(congr,llave)
+                for i in range(0,lt.size(adj)):
+                    vert = lt.getElement(adj,i)
+                    code = vert.split('*')[0]
+                    info = me.getValue(m.get(points,code))
+                    latP = info['latitude']
+                    lonP = info['longitude']
+                    locP = latP,lonP
+                    name = info['name']
+                    folium.Marker(locP,name,icon=folium.Icon(color='green',icon_color='white')).add_to(M)
+                M.save('greater.html')
             i+=1
         retorno = llave,country
         lt.addLast(mayores,retorno)
@@ -366,13 +400,60 @@ def minimumCostPaths(analyzer, initialCapital):
     analyzer['paths'] = djk.Dijkstra(analyzer['connections'], initialCapital)
     return analyzer
 
-def minimumCostPath(analyzer, destCapital):
+def minimumCostPath(analyzer, final, ini):
     """
     Retorna el camino de costo minimo entre la capital de inicio
     y la capital destino
     Se debe ejecutar primero la funcion minimumCostPaths
     """
+    
+    countries = analyzer['countries']
+    countryKeys = m.keySet(countries)
+    points = analyzer['points']
+    iniInfo = me.getValue(m.get(countries,ini))
+    iniLat = iniInfo['CapitalLatitude']
+    iniLon = iniInfo['CapitalLongitude']
+    iniLoc = iniLat,iniLon
+    iniName = iniInfo['CountryName']+', '+iniInfo['CapitalName']
+    M = folium.Map()
+    folium.Marker(iniLoc,iniName,icon=folium.Icon(color='purple')).add_to(M)
+    destCapital = final['CapitalName']
+    desLat = final['CapitalLatitude']
+    desLon = final['CapitalLongitude']
+    desLoc = desLat,desLon
+    desName = final['CountryName']+', '+final['CapitalName']
+    folium.Marker(desLoc,desName,icon=folium.Icon(color='purple')).add_to(M)
     path = djk.pathTo(analyzer['paths'], destCapital)
+    for i in range(0,lt.size(path)):
+        camino = lt.getElement(path,i)
+        punto = camino['vertexB']
+        code = punto.split('*')[0]
+        try:
+            int(code)
+            lPoint = me.getValue(m.get(points,code))
+            pointLat = lPoint['latitude']
+            pointLon = lPoint['longitude']
+            pointLoc = pointLat,pointLon
+            name = str(i)+'. '+lPoint['name']
+            folium.Marker(pointLoc,name,icon=folium.Icon(color='blue')).add_to(M)
+        except:
+            capital = code
+            n = 0
+            found = False
+            while n < lt.size(countryKeys) and found ==False:
+                key = lt.getElement(countryKeys,n+1)
+                info = me.getValue(m.get(countries,key))
+                Capital = info['CapitalName']
+                if capital == Capital:
+                    found = True
+                    country = info['CountryName']
+                    capLat = info['CapitalLatitude']
+                    capLon = info['CapitalLongitude']
+                    capLoc = capLat,capLon
+                    capName = str(i)+'. '+country+', '+capital
+                    folium.Marker(capLoc,capName,icon=folium.Icon(color='blue')).add_to(M)
+                n+=1
+    M.save('path.html')
     return path
 
 r = reprlib.Repr()
@@ -381,17 +462,46 @@ r.maxstring = 20
 r.maxlevel = 20
 
 def minimumSpanningTree(ana):
+    countries = ana['countries']
+    countryKeys = m.keySet(countries)
+    points = ana['points']
     search = prim.PrimMST(ana['connections'])
     relaxed = prim.prim(ana['connections'],search,'Bogota')
-    edges = prim.edgesMST(ana['connections'],search)
+    prim.edgesMST(ana['connections'],search)
     mst = relaxed['mst']
     size = lt.size(mst)
-    '''
-    for i in range(0,size):
-        element = lt.getElement(mst,i)
-        print(element['phase'])
-    '''
     weight = round(prim.weightMST(ana['connections'],relaxed),2)
+    M = folium.Map()
+    for i in range(0,lt.size(mst)):
+        camino = lt.getElement(mst,i)
+        punto = camino['vertexB']
+        code = punto.split('*')[0]
+        try:
+            int(code)
+            lPoint = me.getValue(m.get(points,code))
+            pointLat = lPoint['latitude']
+            pointLon = lPoint['longitude']
+            pointLoc = pointLat,pointLon
+            name = str(i)+'. '+lPoint['name']
+            folium.Marker(pointLoc,name,icon=folium.Icon(color='blue')).add_to(M)
+        except:
+            capital = code
+            n = 0
+            found = False
+            while n < lt.size(countryKeys) and found ==False:
+                key = lt.getElement(countryKeys,n+1)
+                info = me.getValue(m.get(countries,key))
+                Capital = info['CapitalName']
+                if capital == Capital:
+                    found = True
+                    country = info['CountryName']
+                    capLat = info['CapitalLatitude']
+                    capLon = info['CapitalLongitude']
+                    capLoc = capLat,capLon
+                    capName = str(i)+'. '+country+', '+capital
+                    folium.Marker(capLoc,capName,icon=folium.Icon(color='pink')).add_to(M)
+                n+=1
+    M.save('MST.html')
     return weight,size
 
 def impact(ana,vertex):
@@ -399,6 +509,7 @@ def impact(ana,vertex):
     points = ana['points']
     congr = ana['connections']
     pointKeys = m.keySet(points)
+    I = folium.Map()
     j = 0
     encontrado = False
     while j<lt.size(pointKeys) and encontrado == False:
@@ -406,8 +517,13 @@ def impact(ana,vertex):
         LPoint = me.getValue(m.get(points,key))
         city = LPoint['name'].split(',')[0]
         if vertex == city:
-            encontrado = True
             id = LPoint['landing_point_id']
+            encontrado = True
+            pLat = LPoint['latitude']
+            pLon = LPoint['longitude']
+            pLoc = pLat,pLon
+            pName = LPoint['name']
+            folium.Marker(pLoc,pName,icon=folium.Icon(color='red')).add_to(I)
         j+=1
     vertices = me.getValue(m.get(rela,id))
     countries = lt.newList(cmpfunction=compareDistance)
@@ -423,6 +539,12 @@ def impact(ana,vertex):
                 lPoint = me.getValue(m.get(points,str(code)))
                 country = lPoint['name'].split(',')[-1]
                 country = country.strip()
+                name = lPoint['name']
+                lat = lPoint['latitude']
+                lon = lPoint['longitude']
+                loc = lat,lon
+                if country != 'Brazil':
+                    folium.Marker(loc,name,icon=folium.Icon(color='orange')).add_to(I)
                 distance = gr.getEdge(congr,vert,ady)['weight']
                 info = country,distance
                 if country not in llaves:
@@ -430,7 +552,7 @@ def impact(ana,vertex):
                     lt.addLast(countries,info)
             except:
                 pass
-            
+    I.save('impact.html')
     sorted = sortCountries(countries)
     return sorted
 
@@ -519,6 +641,65 @@ def cable(ana,country,cable):
                                         n+=1
                                     
     return band
+
+def IP(ana,IP1,IP2):
+    congr = ana['connections']
+    countries = ana['countries']
+    countryKeys = m.keySet(countries)
+    points = ana['points']
+    info1 = ipapi.location(IP1)
+    hav1 = {'latitude':info1['latitude'],'longitude':info1['longitude']}
+    info2 = ipapi.location(IP2)
+    if IP2 == '8.8.8.8':
+        lat2 = -122.08286045229197
+        lon2 = 37.417661109182816
+        hav2 = {'latitude':lat2,'longitude':lon2}
+    else:
+        hav2 = {'latitude':info2['latitude'],'longitude':info2['longitude']}
+    vertices = gr.vertices(congr)
+    point1 = None
+    point2 = None
+    menor1 = 9999999999999
+    menor2 = 9999999999999
+    for i in range(0,lt.size(vertices)):
+        vert = lt.getElement(vertices,i)
+        code = vert.split('*')[0]
+        try:
+            int(code)
+            lPoint = me.getValue(m.get(points,code))
+            dist1 = haversine(hav1,lPoint)
+            dist2 = haversine(hav2,lPoint)
+            if dist1 < menor1:
+                menor1 = dist1
+                point1 = vert
+            if dist2 < menor2:
+                menor2 = dist2
+                point2 = vert
+        except:
+            capital = code
+            n = 0
+            found = False
+            while n < lt.size(countryKeys) and found ==False:
+                key = lt.getElement(countryKeys,n+1)
+                info = me.getValue(m.get(countries,key))
+                Capital = info['CapitalName']
+                if capital == Capital:
+                    found = True
+                    capLat = info['CapitalLatitude']
+                    capLon = info['CapitalLongitude']
+                    hav = {'latitude': capLat,'longitude':capLon}
+                    dist1 = haversine(hav1,hav)
+                    dist2 = haversine(hav2,hav)
+                    if dist1 < menor1:
+                        menor1 = dist1
+                        point1 = vert
+                    if dist2 < menor2:
+                        menor2 = dist2
+                        point2 = vert
+                n+=1
+    ana['IPs'] = djk.Dijkstra(ana['connections'], point1)
+    path = djk.pathTo(ana['IPs'], point2)
+    return path, point1, point2
 
 #-----------------------------------------------------------------
 # Funciones utilizadas para comparar elementos dentro de una lista
